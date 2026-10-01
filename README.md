@@ -1,4 +1,3 @@
-[dashboard.html](https://github.com/user-attachments/files/32936772/dashboard.html)
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -51,12 +50,15 @@
                     <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-800">รายงานสถิติผลิตภัณฑ์ที่ไม่เป็นไปตามข้อกำหนด (NC)</h1>
                     <p class="text-purple-600 font-medium text-sm mt-0.5 flex items-center gap-1.5">
                         <i class="fa-regular fa-clock text-pink-400"></i>
-                        <span>แผนกหลังพิมพ์ (WG6) | สรุปช่วงเวลา: <span class="font-semibold text-slate-700">มกราคม ถึง ธันวาคม 2569</span></span>
+                        <span>แผนกหลังพิมพ์ (WG6) | สรุปช่วงเวลา: <span id="summaryDateRange" class="font-semibold text-slate-700">มกราคม ถึง ธันวาคม 2569</span></span>
                     </p>
                 </div>
             </div>
         </div>
         <div class="flex items-center gap-3 self-end md:self-auto">
+            <button onclick="fetchDataFromGoogleSheet()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-medium transition flex items-center gap-2 border border-purple-200 shadow-sm">
+                <i class="fa-solid fa-rotate text-purple-400"></i> รีเฟรชข้อมูล
+            </button>
             <button onclick="resetFilters()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-medium transition flex items-center gap-2 border border-purple-200 shadow-sm">
                 <i class="fa-solid fa-rotate-left text-purple-400"></i> ล้างตัวกรอง
             </button>
@@ -252,7 +254,7 @@
             <table class="w-full text-left text-xs text-slate-600">
                 <thead class="bg-purple-50/80 text-purple-800 uppercase text-[11px] font-bold sticky top-0 backdrop-blur-md z-10 border-b border-purple-100">
                     <tr>
-                        <th class="p-3">วันที่</th>
+                        <th class="p-3">วันที่/เวลา</th>
                         <th class="p-3">แผนก</th>
                         <th class="p-3">เครื่อง</th>
                         <th class="p-3">กะ/ผู้ควบคุม</th>
@@ -272,55 +274,120 @@
 
     <!-- Data Injection & Application Logic -->
     <script>
-        // ลิงก์ Web App URL จาก Google Apps Script ของคุณ
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKKqhF6MapYv50JbAMctZr_0V4CjakHbriJTOwb9ctXt4PJx1C5MVPE8wjy6bEe8BM/exec"; 
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIBFOgndI6y_SCYbBvFeY7uJtZIXUzzYaTr6BwtWn-KajxXHzEGrgIXOIvaN9oiPT1xw/exec"; 
 
         let rawData = [];
         let chartPareto, chartDept, chartTrend, chartMachine;
 
-        // ดึงข้อมูลอัตโนมัติเมื่อเปิดหน้าเว็บ
         window.addEventListener('DOMContentLoaded', () => {
             fetchDataFromGoogleSheet();
+            setInterval(fetchDataFromGoogleSheet, 30000);
         });
 
+        function formatDate(val) {
+            if (!val) return "-";
+            const str = val.toString();
+            if (str.includes("T")) {
+                return str.split("T")[0];
+            }
+            if (str.length >= 10) {
+                return str.substring(0, 10);
+            }
+            return str;
+        }
+
+        // ฟังก์ชันอ่านเดือนอัตโนมัติจากข้อมูลใน Sheet หรือคำนวณจากวันที่
+        function parseMonthName(item, formattedDate) {
+            // 1. อ่านจากคอลัมน์ชื่อเรื่องเดือนใน Sheet (ถ้ามี)
+            const rawMonth = item["เดือน"] || item["Month"] || item["เลือกเดือน"] || item["ประจำเดือน"] || "";
+            if (rawMonth) {
+                const mStr = rawMonth.toString().trim();
+                if (mStr.includes("กุมภาพันธ์") || mStr.includes("ก.พ.")) return "กุมภาพันธ์ 69";
+                if (mStr.includes("มกราคม") || mStr.includes("ม.ค.")) return "มกราคม69";
+                if (mStr.includes("มีนาคม") || mStr.includes("มี.ค.")) return "มีนาคม 69";
+                if (mStr.includes("เมษายน") || mStr.includes("เม.ย.")) return "เมษายน 69";
+                if (mStr.includes("พฤษภาคม") || mStr.includes("พ.ค.")) return "พฤษภาคม69";
+                if (mStr.includes("มิถุนายน") || mStr.includes("มิ.ย.")) return "มิถุนายน 69";
+                if (mStr.includes("กรกฎาคม") || mStr.includes("ก.ค.")) return "กรกฎาคม 69";
+                if (mStr.includes("สิงหาคม") || mStr.includes("ส.ค.")) return "สิงหาคม 69";
+                if (mStr.includes("กันยายน") || mStr.includes("ก.ย.")) return "กันยายน 69";
+                if (mStr.includes("ตุลาคม") || mStr.includes("ต.ค.")) return "ตุลาคม 69";
+                if (mStr.includes("พฤศจิกายน") || mStr.includes("พ.ย.")) return "พฤศจิกายน 69";
+                if (mStr.includes("ธันวาคม") || mStr.includes("ธ.ค.")) return "ธันวาคม 69";
+            }
+
+            // 2. ถ้าคอลัมน์เดือนว่างเปล่า ให้แปลงคำนวณจาก วันที่/ประทับเวลา (Timestamp)
+            if (formattedDate && formattedDate !== "-") {
+                const d = new Date(formattedDate);
+                if (!isNaN(d.getTime())) {
+                    const monthIdx = d.getMonth(); // 0 = ม.ค., 1 = ก.พ.
+                    const monthMap = [
+                        "มกราคม69", "กุมภาพันธ์ 69", "มีนาคม 69", "เมษายน 69", 
+                        "พฤษภาคม69", "มิถุนายน 69", "กรกฎาคม 69", "สิงหาคม 69", 
+                        "กันยายน 69", "ตุลาคม 69", "พฤศจิกายน 69", "ธันวาคม 69"
+                    ];
+                    return monthMap[monthIdx] || "มกราคม69";
+                }
+            }
+
+            return "มกราคม69";
+        }
+
         function fetchDataFromGoogleSheet() {
-            document.getElementById('recordCount').innerText = "กำลังดึงข้อมูลจาก Google Sheets...";
+            document.getElementById('recordCount').innerText = "กำลังดึงข้อมูลล่าสุด...";
 
             fetch(GOOGLE_SCRIPT_URL)
                 .then(response => response.json())
                 .then(data => {
-                    // แปลงข้อมูลจาก Google Sheet / Form เข้าโครงสร้าง Dashboard
-                    rawData = data.map((item, index) => ({
-                        id: index + 1,
-                        date: item["ประทับเวลา"] ? item["ประทับเวลา"].toString().slice(0, 10) : (item["วันที่"] || item["วันที่พบปัญหา"] || "-"),
-                        dept_norm: item["แผนก"] || "ไม่ระบุ",
-                        machine: item["หมายเลขเครื่องจักร"] || item["เครื่อง"] || "ไม่ระบุ",
-                        shift: item["กะการทำงาน"] || item["กะ"] || "-",
-                        operator: item["หัวหน้าเครื่อง / ผู้ควบคุม"] || item["ผู้ควบคุม"] || "-",
-                        job: item["เลข JOB"] || item["JOB"] || "-",
-                        problem: item["ปัญหาที่พบ"] || item["ปัญหา"] || "-",
-                        qty_sheets: Number(item["จำนวนของเสีย (แผ่น)"] || item["จำนวนแผ่น"] || item["จำนวนของเสีย แผ่น"]) || 0,
-                        qty_pcs: Number(item["จำนวนของเสีย (ชิ้น)"] || item["จำนวนชิ้น"] || item["จำนวนของเสีย ชิ้น"]) || 0,
-                        detail: item["รายละเอียดปัญหา / ช่วงที่พบ"] || item["รายละเอียด"] || "-",
-                        action: item["มาตรการแก้ไข"] || item["การแก้ไข"] || "-",
-                        reporter: item["ผู้แจ้งปัญหา"] || item["ผู้แจ้ง"] || "-",
-                        month: item["เดือน"] || "มกราคม69"
-                    }));
+                    rawData = data.map((item, index) => {
+                        const rawDate = item["ประทับเวลา"] || item["Timestamp"] || item["วันที่"] || item["วันที่พบปัญหา"] || "";
+                        const formattedDate = formatDate(rawDate);
+                        const detectedMonth = parseMonthName(item, formattedDate);
 
-                    // ประมวลผลและสร้างกราฟ
+                        return {
+                            id: index + 1,
+                            date: formattedDate,
+                            dept_norm: item["แผนก"] || "ไม่ระบุ",
+                            machine: item["หมายเลขเครื่องจักร"] || item["เครื่อง"] || "ไม่ระบุ",
+                            shift: item["กะการทำงาน"] || item["กะ"] || "-",
+                            operator: item["หัวหน้าเครื่อง / ผู้ควบคุม"] || item["ผู้ควบคุม"] || "-",
+                            job: item["เลข JOB"] || item["JOB"] || "-",
+                            problem: item["ปัญหาที่พบ"] || item["ปัญหา"] || "-",
+                            qty_sheets: Number(item["จำนวนของเสีย (แผ่น)"] || item["จำนวนแผ่น"] || item["จำนวนของเสีย แผ่น"]) || 0,
+                            qty_pcs: Number(item["จำนวนของเสีย (ชิ้น)"] || item["จำนวนชิ้น"] || item["จำนวนของเสีย ชิ้น"]) || 0,
+                            detail: item["รายละเอียดปัญหา / ช่วงที่พบ"] || item["รายละเอียด"] || "-",
+                            action: item["มาตรการแก้ไข"] || item["การแก้ไข"] || "-",
+                            reporter: item["ผู้แจ้งปัญหา"] || item["ผู้แจ้ง"] || "-",
+                            month: detectedMonth
+                        };
+                    });
+
+                    updateDateRangeHeader(rawData);
                     populateDropdowns();
                     renderCharts();
                     applyFilters();
                 })
                 .catch(error => {
                     console.error("Error fetching data:", error);
-                    alert("ไม่สามารถดึงข้อมูลได้ กรุณาตรวจสอบสิทธิ์การแชร์ของ Apps Script หรือรีเฟรชอีกครั้งค่ะ");
+                    document.getElementById('recordCount').innerText = "ดึงข้อมูลไม่สำเร็จ";
                 });
+        }
+
+        function updateDateRangeHeader(data) {
+            const validDates = data.map(d => d.date).filter(d => d !== "-").sort();
+            if (validDates.length > 0) {
+                const startDate = validDates[0];
+                const endDate = validDates[validDates.length - 1];
+                document.getElementById('summaryDateRange').innerText = `${startDate} ถึง ${endDate}`;
+            } else {
+                document.getElementById('summaryDateRange').innerText = "มกราคม ถึง ธันวาคม 2569";
+            }
         }
 
         function populateDropdowns() {
             const depts = [...new Set(rawData.map(item => item.dept_norm))].sort();
             const deptSelect = document.getElementById('filterDept');
+            const currentDept = deptSelect.value;
             deptSelect.innerHTML = '<option value="ALL">ทุกแผนก</option>';
             depts.forEach(d => {
                 const opt = document.createElement('option');
@@ -328,9 +395,11 @@
                 opt.textContent = d;
                 deptSelect.appendChild(opt);
             });
+            if (depts.includes(currentDept)) deptSelect.value = currentDept;
 
             const machines = [...new Set(rawData.map(item => item.machine))].filter(m => m !== 'ไม่ระบุ').sort();
             const mcSelect = document.getElementById('filterMachine');
+            const currentMc = mcSelect.value;
             mcSelect.innerHTML = '<option value="ALL">ทุกเครื่องจักร</option>';
             machines.forEach(m => {
                 const opt = document.createElement('option');
@@ -338,6 +407,7 @@
                 opt.textContent = `เครื่อง ${m}`;
                 mcSelect.appendChild(opt);
             });
+            if (machines.includes(currentMc)) mcSelect.value = currentMc;
         }
 
         function getFilteredData() {
