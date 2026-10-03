@@ -274,7 +274,7 @@
 
     <!-- Data Injection & Application Logic -->
     <script>
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIBFOgndI6y_SCYbBvFeY7uJtZIXUzzYaTr6BwtWn-KajxXHzEGrgIXOIvaN9oiPT1xw/exec"; 
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw-TdxEo4ci_Uhi8tUy6V2KbAdQHRF9AJJGESrsWeKagrUMSZ7LVSYS_MAnSEiHn4CZtg/exec"; 
 
         let rawData = [];
         let chartPareto, chartDept, chartTrend, chartMachine;
