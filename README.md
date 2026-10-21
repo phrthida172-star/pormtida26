@@ -250,15 +250,14 @@
             <table class="w-full text-left text-xs text-slate-600">
                 <thead class="bg-purple-50/80 text-purple-800 uppercase text-[11px] font-bold sticky top-0 backdrop-blur-md z-10 border-b border-purple-100">
                     <tr>
-                        <th class="p-3">วันที่</th>
-                        <th class="p-3">แผนก</th>
+                        <th class="p-3">วันที่พบปัญหา</th>
+                        <th class="p-3">แผนกที่พบปัญหา</th>
                         <th class="p-3">เครื่อง</th>
-                        <th class="p-3">กะ/ผู้ควบคุม</th>
-                        <th class="p-3">เลข JOB</th>
+                        <th class="p-3">กะการทำงาน</th>
+                        <th class="p-3">หัวหน้าเครื่อง</th>
+                        <th class="p-3">เลขที่ใบสั่งผลิต</th>
                         <th class="p-3">ปัญหาที่พบ</th>
-                        <th class="p-3 text-right">จำนวน (แผ่น/ชิ้น)</th>
-                        <th class="p-3">รายละเอียด / การแก้ไข</th>
-                        <th class="p-3">ผู้แจ้ง</th>
+                        <th class="p-3 text-right">จำนวน (ชิ้น/แผ่น)</th>
                     </tr>
                 </thead>
                 <tbody id="ncTableBody" class="divide-y divide-purple-50 bg-white">
@@ -274,4 +273,262 @@
         let rawData = [];
         let chartPareto, chartDept, chartTrend, chartMachine;
 
-        window.addEventListener('
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchDataFromGoogleSheet();
+        });
+
+        function fetchDataFromGoogleSheet() {
+            document.getElementById('recordCount').innerText = "กำลังดึงข้อมูลจาก Google Sheets...";
+
+            fetch(GOOGLE_SCRIPT_URL)
+                .then(response => response.json())
+                .then(data => {
+                    rawData = data.map((item, index) => {
+                        let rawMonth = item["เดือน"] ? item["เดือน"].toString().trim() : "";
+                        if (rawMonth.startsWith("มกราคม") && !rawMonth.includes(" ")) rawMonth = "มกราคม 69";
+                        if (rawMonth.startsWith("พฤษภาคม") && !rawMonth.includes(" ")) rawMonth = "พฤษภาคม 69";
+
+                        return {
+                            id: index + 1,
+                            date: item["วันที่พบปัญหา"] ? item["วันที่พบปัญหา"].toString().slice(0, 10) : "-",
+                            dept_norm: item["แผนกที่พบปัญหา"] || "ไม่ระบุ",
+                            machine: item["เครื่อง"] || "ไม่ระบุ",
+                            shift: item["กะการทำงาน"] || "-",
+                            operator: item["หัวหน้าเครื่อง"] || "-",
+                            job: item["เลขที่ใบสั่งผลิต"] || "-",
+                            problem: item["ปัญหาที่พบ"] || "-",
+                            qty_pcs: Number(item["จำนวนของเสีย (ชิ้น)"]) || 0,
+                            qty_sheets: Number(item["จำนวนขอ(แผ่น)"] || item["จำนวนของเสีย (แผ่น)"]) || 0,
+                            month: rawMonth || "มกราคม 69"
+                        };
+                    });
+
+                    populateDropdowns();
+                    renderCharts();
+                    applyFilters();
+                })
+                .catch(error => {
+                    console.error("Error fetching data:", error);
+                    alert("ไม่สามารถดึงข้อมูลได้ กรุณาตรวจสอบสิทธิ์การแชร์ของ Apps Script หรือรีเฟรชอีกครั้งค่ะ");
+                });
+        }
+
+        function populateDropdowns() {
+            const depts = [...new Set(rawData.map(item => item.dept_norm))].sort();
+            const deptSelect = document.getElementById('filterDept');
+            deptSelect.innerHTML = '<option value="ALL">ทุกแผนก</option>';
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                deptSelect.appendChild(opt);
+            });
+
+            const machines = [...new Set(rawData.map(item => item.machine))].filter(m => m !== 'ไม่ระบุ').sort();
+            const mcSelect = document.getElementById('filterMachine');
+            mcSelect.innerHTML = '<option value="ALL">ทุกเครื่องจักร</option>';
+            machines.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = `เครื่อง ${m}`;
+                mcSelect.appendChild(opt);
+            });
+        }
+
+        function getFilteredData() {
+            const month = document.getElementById('filterMonth').value;
+            const dept = document.getElementById('filterDept').value;
+            const mc = document.getElementById('filterMachine').value;
+            const shift = document.getElementById('filterShift').value;
+            const search = document.getElementById('filterSearch').value.toLowerCase().trim();
+
+            return rawData.filter(item => {
+                if (month !== 'ALL' && item.month !== month) return false;
+                if (dept !== 'ALL' && item.dept_norm !== dept) return false;
+                if (mc !== 'ALL' && item.machine !== mc) return false;
+                if (shift !== 'ALL' && item.shift !== shift) return false;
+                if (search !== '') {
+                    const matchProb = item.problem.toLowerCase().includes(search);
+                    const matchJob = item.job.toLowerCase().includes(search);
+                    const matchOp = item.operator.toLowerCase().includes(search);
+                    if (!matchProb && !matchJob && !matchOp) return false;
+                }
+                return true;
+            });
+        }
+
+        function applyFilters() {
+            const filtered = getFilteredData();
+            updateKPIs(filtered);
+            updateTable(filtered);
+            updateCharts(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('filterMonth').value = 'ALL';
+            document.getElementById('filterDept').value = 'ALL';
+            document.getElementById('filterMachine').value = 'ALL';
+            document.getElementById('filterShift').value = 'ALL';
+            document.getElementById('filterSearch').value = '';
+            applyFilters();
+        }
+
+        function updateKPIs(data) {
+            document.getElementById('kpiTotalNC').innerText = data.length.toLocaleString();
+            
+            const totalSheets = data.reduce((acc, curr) => acc + (curr.qty_sheets || 0), 0);
+            document.getElementById('kpiTotalSheets').innerText = totalSheets.toLocaleString();
+
+            const totalPcs = data.reduce((acc, curr) => acc + (curr.qty_pcs || 0), 0);
+            document.getElementById('kpiTotalPcs').innerText = totalPcs.toLocaleString();
+
+            const deptCounts = {};
+            data.forEach(d => { deptCounts[d.dept_norm] = (deptCounts[d.dept_norm] || 0) + 1; });
+            let topDept = '-';
+            let maxCount = 0;
+            Object.keys(deptCounts).forEach(dept => {
+                if (deptCounts[dept] > maxCount) {
+                    maxCount = deptCounts[dept];
+                    topDept = dept;
+                }
+            });
+            document.getElementById('kpiTopDept').innerText = topDept;
+            document.getElementById('kpiTopDeptSub').innerText = `${maxCount} เคส (${data.length ? Math.round((maxCount/data.length)*100) : 0}%)`;
+        }
+
+        function updateTable(data) {
+            const tbody = document.getElementById('ncTableBody');
+            document.getElementById('recordCount').innerText = data.length;
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400">ไม่พบข้อมูลตรงตามเงื่อนไขที่เลือก</td></tr>`;
+                return;
+            }
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-purple-50/60 transition border-b border-purple-50';
+                
+                const qtyText = `${item.qty_sheets.toLocaleString()} แผ่น / ${item.qty_pcs.toLocaleString()} ชิ้น`;
+
+                tr.innerHTML = `
+                    <td class="p-3 font-mono text-slate-500 whitespace-nowrap">${item.date}</td>
+                    <td class="p-3"><span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700 text-[11px] font-medium">${item.dept_norm}</span></td>
+                    <td class="p-3 font-semibold text-purple-600">${item.machine}</td>
+                    <td class="p-3"><span class="text-amber-600 font-semibold">กะ ${item.shift}</span> <span class="text-slate-400">(${item.operator})</span></td>
+                    <td class="p-3 font-mono text-slate-600">${item.job}</td>
+                    <td class="p-3 font-medium text-pink-500">${item.problem}</td>
+                    <td class="p-3 text-right font-mono font-bold text-amber-600">${qtyText}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.font.family = 'Prompt';
+
+            if(chartPareto) chartPareto.destroy();
+            if(chartDept) chartDept.destroy();
+            if(chartTrend) chartTrend.destroy();
+            if(chartMachine) chartMachine.destroy();
+
+            const ctxPareto = document.getElementById('paretoChart').getContext('2d');
+            chartPareto = new Chart(ctxPareto, {
+                type: 'bar',
+                data: { 
+                    labels: [], 
+                    datasets: [{ 
+                        label: 'จำนวนเคส', 
+                        data: [], 
+                        backgroundColor: ['#c084fc', '#f472b6', '#fb923c', '#fbbf24', '#34d399', '#38bdf8', '#818cf8'], 
+                        borderRadius: 8 
+                    }] 
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+            });
+
+            const ctxDept = document.getElementById('deptChart').getContext('2d');
+            chartDept = new Chart(ctxDept, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#c084fc', '#f472b6', '#fb923c', '#34d399', '#38bdf8', '#a78bfa'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            chartTrend = new Chart(ctxTrend, {
+                type: 'line',
+                data: { 
+                    labels: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'], 
+                    datasets: [{ 
+                        label: 'จำนวน NC (เคส)', 
+                        data: [], 
+                        borderColor: '#c084fc', 
+                        backgroundColor: 'rgba(192, 132, 252, 0.15)', 
+                        fill: true, 
+                        tension: 0.35, 
+                        pointRadius: 5, 
+                        pointBackgroundColor: '#c084fc' 
+                    }] 
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+            });
+
+            const ctxMachine = document.getElementById('machineChart').getContext('2d');
+            chartMachine = new Chart(ctxMachine, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'จำนวนเคส', data: [], backgroundColor: '#fb923c', borderRadius: 8 }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } } }
+            });
+        }
+
+        function updateCharts(data) {
+            const probCounts = {};
+            data.forEach(d => { probCounts[d.problem] = (probCounts[d.problem] || 0) + 1; });
+            const sortedProbs = Object.entries(probCounts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            chartPareto.data.labels = sortedProbs.map(d => d[0]);
+            chartPareto.data.datasets[0].data = sortedProbs.map(d => d[1]);
+            chartPareto.update();
+
+            const deptCounts = {};
+            data.forEach(d => { deptCounts[d.dept_norm] = (deptCounts[d.dept_norm] || 0) + 1; });
+            chartDept.data.labels = Object.keys(deptCounts);
+            chartDept.data.datasets[0].data = Object.values(deptCounts);
+            chartDept.update();
+
+            const monthsOrder = [
+                'มกราคม 69', 'กุมภาพันธ์ 69', 'มีนาคม 69', 'เมษายน 69', 
+                'พฤษภาคม 69', 'มิถุนายน 69', 'กรกฎาคม 69', 'สิงหาคม 69', 
+                'กันยายน 69', 'ตุลาคม 69', 'พฤศจิกายน 69', 'ธันวาคม 69'
+            ];
+            const trendData = monthsOrder.map(m => data.filter(d => d.month === m).length);
+            chartTrend.data.datasets[0].data = trendData;
+            chartTrend.update();
+
+            const mcCounts = {};
+            data.forEach(d => { if(d.machine !== 'ไม่ระบุ') mcCounts[d.machine] = (mcCounts[d.machine] || 0) + 1; });
+            const sortedMcs = Object.entries(mcCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+            chartMachine.data.labels = sortedMcs.map(d => d[0]);
+            chartMachine.data.datasets[0].data = sortedMcs.map(d => d[1]);
+            chartMachine.update();
+        }
+
+        function exportCSV() {
+            const filtered = getFilteredData();
+            if(!filtered.length) { alert('ไม่มีข้อมูลสำหรับส่งออก'); return; }
+
+            let csvContent = "\uFEFFวันที่พบปัญหา,แผนกที่พบปัญหา,เครื่อง,กะการทำงาน,หัวหน้าเครื่อง,เลขที่ใบสั่งผลิต,ปัญหาที่พบ,จำนวนชิ้น,จำนวนแผ่น\n";
+            filtered.forEach(r => {
+                csvContent += `"${r.date}","${r.dept_norm}","${r.machine}","${r.shift}","${r.operator}","${r.job}","${r.problem}","${r.qty_pcs}","${r.qty_sheets}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `NC_Report_WG6_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
