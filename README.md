@@ -253,7 +253,8 @@
                         <th class="p-3">วันที่พบปัญหา</th>
                         <th class="p-3">แผนกที่พบปัญหา</th>
                         <th class="p-3">เครื่อง</th>
-                        <th class="p-3">กะการทำงาน / หัวหน้าเครื่อง</th>
+                        <th class="p-3">กะการทำงาน</th>
+                        <th class="p-3">หัวหน้าเครื่อง</th>
                         <th class="p-3">เลขที่ใบสั่งผลิต</th>
                         <th class="p-3">ปัญหาที่พบ</th>
                         <th class="p-3 text-right">จำนวน (แผ่น/ชิ้น)</th>
@@ -283,34 +284,18 @@
                 .then(response => response.json())
                 .then(data => {
                     rawData = data.map((item, index) => {
-                        // รองรับชื่อคอลัมน์หลายรูปแบบที่ตรงกับ Google Sheets ของคุณ
-                        let dept = item["แผนกที่พบปัญหา"] || item["แผนก"] || "ไม่ระบุ";
-                        let mc = item["เครื่อง"] || item["หมายเลขเครื่องจักร"] || "ไม่ระบุ";
-                        let shift = item["กะการทำงาน"] || item["กะ"] || "-";
-                        let operator = item["หัวหน้าเครื่อง"] || item["หัวหน้าเครื่อง / ผู้ควบคุม"] || item["ผู้ควบคุม"] || "-";
-                        let job = item["เลขที่ใบสั่งผลิต"] || item["เลข JOB"] || item["JOB"] || "-";
-                        let problem = item["ปัญหาที่พบ"] || item["ปัญหา"] || "-";
-                        let dateVal = item["วันที่พบปัญหา"] || item["วันที่"] || item["ประทับเวลา"] || "-";
-                        let qtySheets = Number(item["จำนวนขอ(แผ่น)"] || item["จำนวนของเสีย (แผ่น)"] || item["จำนวนแผ่น"]) || 0;
-                        let qtyPcs = Number(item["จำนวนของเสีย (ชิ้น)"] || item["จำนวนชิ้น"]) || 0;
-
-                        // ปรับแต่งชื่อเดือนให้ตรงตามมาตรฐาน
-                        let rawMonth = item["เดือน"] ? item["เดือน"].toString().trim() : "";
-                        if (rawMonth.startsWith("มกราคม") && !rawMonth.includes(" ")) rawMonth = "มกราคม 69";
-                        if (rawMonth.startsWith("พฤษภาคม") && !rawMonth.includes(" ")) rawMonth = "พฤษภาคม 69";
-
                         return {
                             id: index + 1,
-                            date: dateVal.toString().slice(0, 10),
-                            dept_norm: dept.toString().trim(),
-                            machine: mc.toString().trim(),
-                            shift: shift.toString().trim(),
-                            operator: operator.toString().trim(),
-                            job: job.toString().trim(),
-                            problem: problem.toString().trim(),
-                            qty_sheets: qtySheets,
-                            qty_pcs: qtyPcs,
-                            month: rawMonth || "ตุลาคม 69"
+                            date: item["วันที่พบปัญหา"] ? item["วันที่พบปัญหา"].toString().slice(0, 10) : "-",
+                            dept_norm: item["แผนกที่พบปัญหา"] || "ไม่ระบุ",
+                            machine: item["เครื่อง"] || "ไม่ระบุ",
+                            shift: item["กะการทำงาน"] || "-",
+                            operator: item["หัวหน้าเครื่อง"] || "-",
+                            job: item["เลขที่ใบสั่งผลิต"] || "-",
+                            problem: item["ปัญหาที่พบ"] || "-",
+                            qty_pcs: Number(item["จำนวนของเสีย (ชิ้น)"]) || 0,
+                            qty_sheets: Number(item["จำนวนขอ(แผ่น)"]) || 0,
+                            month: item["เดือน"] || "ตุลาคม 69"
                         };
                     });
 
@@ -413,7 +398,7 @@
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">ไม่พบข้อมูลตรงตามเงื่อนไขที่เลือก</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400">ไม่พบข้อมูลตรงตามเงื่อนไขที่เลือก</td></tr>`;
                 return;
             }
 
@@ -421,14 +406,14 @@
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-purple-50/60 transition border-b border-purple-50';
                 
-                const qtyText = item.qty_sheets > 0 ? `${item.qty_sheets.toLocaleString()} แผ่น` : 
-                                (item.qty_pcs > 0 ? `${item.qty_pcs.toLocaleString()} ชิ้น` : '-');
+                const qtyText = `${item.qty_sheets.toLocaleString()} แผ่น / ${item.qty_pcs.toLocaleString()} ชิ้น`;
 
                 tr.innerHTML = `
                     <td class="p-3 font-mono text-slate-500 whitespace-nowrap">${item.date}</td>
                     <td class="p-3"><span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700 text-[11px] font-medium">${item.dept_norm}</span></td>
-                    <td class="p-3 font-semibold text-purple-600">${item.machine !== 'ไม่ระบุ' ? 'เครื่อง ' + item.machine : '-'}</td>
-                    <td class="p-3"><span class="text-amber-600 font-semibold">กะ ${item.shift}</span> <span class="text-slate-400">(${item.operator})</span></td>
+                    <td class="p-3 font-semibold text-purple-600">${item.machine}</td>
+                    <td class="p-3 text-amber-600 font-semibold">กะ ${item.shift}</td>
+                    <td class="p-3 text-slate-600">${item.operator}</td>
                     <td class="p-3 font-mono text-slate-600">${item.job}</td>
                     <td class="p-3 font-medium text-pink-500">${item.problem}</td>
                     <td class="p-3 text-right font-mono font-bold text-amber-600">${qtyText}</td>
@@ -515,4 +500,19 @@
                 'กันยายน 69', 'ตุลาคม 69', 'พฤศจิกายน 69', 'ธันวาคม 69'
             ];
             const trendData = monthsOrder.map(m => data.filter(d => d.month === m).length);
-            chartTrend.data.
+            chartTrend.data.datasets[0].data = trendData;
+            chartTrend.update();
+
+            const mcCounts = {};
+            data.forEach(d => { if(d.machine !== 'ไม่ระบุ') mcCounts[d.machine] = (mcCounts[d.machine] || 0) + 1; });
+            const sortedMcs = Object.entries(mcCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+            chartMachine.data.labels = sortedMcs.map(d => d[0]);
+            chartMachine.data.datasets[0].data = sortedMcs.map(d => d[1]);
+            chartMachine.update();
+        }
+
+        function exportCSV() {
+            const filtered = getFilteredData();
+            if(!filtered.length) { alert('ไม่มีข้อมูลสำหรับส่งออก'); return; }
+
+            let csvContent = "\uFEFFวันที่พบปัญหา,แผนกที่พบปัญหา,เครื่อง,กะการทำงาน,หัวหน้าเครื่อง,เลขที่ใบสั่งผลิต,ปัญหาที่พบ
