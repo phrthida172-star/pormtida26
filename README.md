@@ -38,7 +38,6 @@
     </style>
 </head>
 <body class="p-4 md:p-6 custom-scrollbar">
-
     <!-- Header Section -->
     <header class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rainbow-card p-6 border-l-8 border-l-purple-400">
         <div>
@@ -50,15 +49,12 @@
                     <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-800">รายงานสถิติผลิตภัณฑ์ที่ไม่เป็นไปตามข้อกำหนด (NC)</h1>
                     <p class="text-purple-600 font-medium text-sm mt-0.5 flex items-center gap-1.5">
                         <i class="fa-regular fa-clock text-pink-400"></i>
-                        <span>แผนกหลังพิมพ์ (WG6) | สรุปช่วงเวลา: <span id="summaryDateRange" class="font-semibold text-slate-700">มกราคม ถึง ธันวาคม 2569</span></span>
+                        <span>แผนกหลังพิมพ์ (WG6) | สรุปช่วงเวลา: <span class="font-semibold text-slate-700">มกราคม ถึง ธันวาคม 2569</span></span>
                     </p>
                 </div>
             </div>
         </div>
         <div class="flex items-center gap-3 self-end md:self-auto">
-            <button onclick="fetchDataFromGoogleSheet()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-medium transition flex items-center gap-2 border border-purple-200 shadow-sm">
-                <i class="fa-solid fa-rotate text-purple-400"></i> รีเฟรชข้อมูล
-            </button>
             <button onclick="resetFilters()" class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-medium transition flex items-center gap-2 border border-purple-200 shadow-sm">
                 <i class="fa-solid fa-rotate-left text-purple-400"></i> ล้างตัวกรอง
             </button>
@@ -74,11 +70,11 @@
             <label class="block text-xs font-semibold text-slate-500 mb-1.5"><i class="fa-regular fa-calendar text-pink-400 mr-1"></i> เดือน</label>
             <select id="filterMonth" onchange="applyFilters()" class="w-full bg-slate-50/80 border border-pink-200 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-pink-300">
                 <option value="ALL">ทุกเดือนตามข้อมูล (ม.ค. - ธ.ค.)</option>
-                <option value="มกราคม69">มกราคม 2569</option>
+                <option value="มกราคม 69">มกราคม 2569</option>
                 <option value="กุมภาพันธ์ 69">กุมภาพันธ์ 2569</option>
                 <option value="มีนาคม 69">มีนาคม 2569</option>
                 <option value="เมษายน 69">เมษายน 2569</option>
-                <option value="พฤษภาคม69">พฤษภาคม 2569</option>
+                <option value="พฤษภาคม 69">พฤษภาคม 2569</option>
                 <option value="มิถุนายน 69">มิถุนายน 2569</option>
                 <option value="กรกฎาคม 69">กรกฎาคม 2569</option>
                 <option value="สิงหาคม 69">สิงหาคม 2569</option>
@@ -254,7 +250,7 @@
             <table class="w-full text-left text-xs text-slate-600">
                 <thead class="bg-purple-50/80 text-purple-800 uppercase text-[11px] font-bold sticky top-0 backdrop-blur-md z-10 border-b border-purple-100">
                     <tr>
-                        <th class="p-3">วันที่/เวลา</th>
+                        <th class="p-3">วันที่</th>
                         <th class="p-3">แผนก</th>
                         <th class="p-3">เครื่อง</th>
                         <th class="p-3">กะ/ผู้ควบคุม</th>
@@ -274,339 +270,8 @@
 
     <!-- Data Injection & Application Logic -->
     <script>
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw-TdxEo4ci_Uhi8tUy6V2KbAdQHRF9AJJGESrsWeKagrUMSZ7LVSYS_MAnSEiHn4CZtg/exec"; 
-
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKKqhF6MapYv50JbAMctZr_0V4CjakHbriJTOwb9ctXt4PJx1C5MVPE8wjy6bEe8BM/exec"; 
         let rawData = [];
         let chartPareto, chartDept, chartTrend, chartMachine;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            fetchDataFromGoogleSheet();
-            setInterval(fetchDataFromGoogleSheet, 30000);
-        });
-
-        function formatDate(val) {
-            if (!val) return "-";
-            const str = val.toString();
-            if (str.includes("T")) {
-                return str.split("T")[0];
-            }
-            if (str.length >= 10) {
-                return str.substring(0, 10);
-            }
-            return str;
-        }
-
-        // ฟังก์ชันอ่านเดือนอัตโนมัติจากข้อมูลใน Sheet หรือคำนวณจากวันที่
-        function parseMonthName(item, formattedDate) {
-            // 1. อ่านจากคอลัมน์ชื่อเรื่องเดือนใน Sheet (ถ้ามี)
-            const rawMonth = item["เดือน"] || item["Month"] || item["เลือกเดือน"] || item["ประจำเดือน"] || "";
-            if (rawMonth) {
-                const mStr = rawMonth.toString().trim();
-                if (mStr.includes("กุมภาพันธ์") || mStr.includes("ก.พ.")) return "กุมภาพันธ์ 69";
-                if (mStr.includes("มกราคม") || mStr.includes("ม.ค.")) return "มกราคม69";
-                if (mStr.includes("มีนาคม") || mStr.includes("มี.ค.")) return "มีนาคม 69";
-                if (mStr.includes("เมษายน") || mStr.includes("เม.ย.")) return "เมษายน 69";
-                if (mStr.includes("พฤษภาคม") || mStr.includes("พ.ค.")) return "พฤษภาคม69";
-                if (mStr.includes("มิถุนายน") || mStr.includes("มิ.ย.")) return "มิถุนายน 69";
-                if (mStr.includes("กรกฎาคม") || mStr.includes("ก.ค.")) return "กรกฎาคม 69";
-                if (mStr.includes("สิงหาคม") || mStr.includes("ส.ค.")) return "สิงหาคม 69";
-                if (mStr.includes("กันยายน") || mStr.includes("ก.ย.")) return "กันยายน 69";
-                if (mStr.includes("ตุลาคม") || mStr.includes("ต.ค.")) return "ตุลาคม 69";
-                if (mStr.includes("พฤศจิกายน") || mStr.includes("พ.ย.")) return "พฤศจิกายน 69";
-                if (mStr.includes("ธันวาคม") || mStr.includes("ธ.ค.")) return "ธันวาคม 69";
-            }
-
-            // 2. ถ้าคอลัมน์เดือนว่างเปล่า ให้แปลงคำนวณจาก วันที่/ประทับเวลา (Timestamp)
-            if (formattedDate && formattedDate !== "-") {
-                const d = new Date(formattedDate);
-                if (!isNaN(d.getTime())) {
-                    const monthIdx = d.getMonth(); // 0 = ม.ค., 1 = ก.พ.
-                    const monthMap = [
-                        "มกราคม69", "กุมภาพันธ์ 69", "มีนาคม 69", "เมษายน 69", 
-                        "พฤษภาคม69", "มิถุนายน 69", "กรกฎาคม 69", "สิงหาคม 69", 
-                        "กันยายน 69", "ตุลาคม 69", "พฤศจิกายน 69", "ธันวาคม 69"
-                    ];
-                    return monthMap[monthIdx] || "มกราคม69";
-                }
-            }
-
-            return "มกราคม69";
-        }
-
-        function fetchDataFromGoogleSheet() {
-            document.getElementById('recordCount').innerText = "กำลังดึงข้อมูลล่าสุด...";
-
-            fetch(GOOGLE_SCRIPT_URL)
-                .then(response => response.json())
-                .then(data => {
-                    rawData = data.map((item, index) => {
-                        const rawDate = item["ประทับเวลา"] || item["Timestamp"] || item["วันที่"] || item["วันที่พบปัญหา"] || "";
-                        const formattedDate = formatDate(rawDate);
-                        const detectedMonth = parseMonthName(item, formattedDate);
-
-                        return {
-                            id: index + 1,
-                            date: formattedDate,
-                            dept_norm: item["แผนก"] || "ไม่ระบุ",
-                            machine: item["หมายเลขเครื่องจักร"] || item["เครื่อง"] || "ไม่ระบุ",
-                            shift: item["กะการทำงาน"] || item["กะ"] || "-",
-                            operator: item["หัวหน้าเครื่อง / ผู้ควบคุม"] || item["ผู้ควบคุม"] || "-",
-                            job: item["เลข JOB"] || item["JOB"] || "-",
-                            problem: item["ปัญหาที่พบ"] || item["ปัญหา"] || "-",
-                            qty_sheets: Number(item["จำนวนของเสีย (แผ่น)"] || item["จำนวนแผ่น"] || item["จำนวนของเสีย แผ่น"]) || 0,
-                            qty_pcs: Number(item["จำนวนของเสีย (ชิ้น)"] || item["จำนวนชิ้น"] || item["จำนวนของเสีย ชิ้น"]) || 0,
-                            detail: item["รายละเอียดปัญหา / ช่วงที่พบ"] || item["รายละเอียด"] || "-",
-                            action: item["มาตรการแก้ไข"] || item["การแก้ไข"] || "-",
-                            reporter: item["ผู้แจ้งปัญหา"] || item["ผู้แจ้ง"] || "-",
-                            month: detectedMonth
-                        };
-                    });
-
-                    updateDateRangeHeader(rawData);
-                    populateDropdowns();
-                    renderCharts();
-                    applyFilters();
-                })
-                .catch(error => {
-                    console.error("Error fetching data:", error);
-                    document.getElementById('recordCount').innerText = "ดึงข้อมูลไม่สำเร็จ";
-                });
-        }
-
-        function updateDateRangeHeader(data) {
-            const validDates = data.map(d => d.date).filter(d => d !== "-").sort();
-            if (validDates.length > 0) {
-                const startDate = validDates[0];
-                const endDate = validDates[validDates.length - 1];
-                document.getElementById('summaryDateRange').innerText = `${startDate} ถึง ${endDate}`;
-            } else {
-                document.getElementById('summaryDateRange').innerText = "มกราคม ถึง ธันวาคม 2569";
-            }
-        }
-
-        function populateDropdowns() {
-            const depts = [...new Set(rawData.map(item => item.dept_norm))].sort();
-            const deptSelect = document.getElementById('filterDept');
-            const currentDept = deptSelect.value;
-            deptSelect.innerHTML = '<option value="ALL">ทุกแผนก</option>';
-            depts.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d;
-                opt.textContent = d;
-                deptSelect.appendChild(opt);
-            });
-            if (depts.includes(currentDept)) deptSelect.value = currentDept;
-
-            const machines = [...new Set(rawData.map(item => item.machine))].filter(m => m !== 'ไม่ระบุ').sort();
-            const mcSelect = document.getElementById('filterMachine');
-            const currentMc = mcSelect.value;
-            mcSelect.innerHTML = '<option value="ALL">ทุกเครื่องจักร</option>';
-            machines.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = `เครื่อง ${m}`;
-                mcSelect.appendChild(opt);
-            });
-            if (machines.includes(currentMc)) mcSelect.value = currentMc;
-        }
-
-        function getFilteredData() {
-            const month = document.getElementById('filterMonth').value;
-            const dept = document.getElementById('filterDept').value;
-            const mc = document.getElementById('filterMachine').value;
-            const shift = document.getElementById('filterShift').value;
-            const search = document.getElementById('filterSearch').value.toLowerCase().trim();
-
-            return rawData.filter(item => {
-                if (month !== 'ALL' && item.month !== month) return false;
-                if (dept !== 'ALL' && item.dept_norm !== dept) return false;
-                if (mc !== 'ALL' && item.machine !== mc) return false;
-                if (shift !== 'ALL' && item.shift !== shift) return false;
-                if (search !== '') {
-                    const matchProb = item.problem.toLowerCase().includes(search);
-                    const matchJob = item.job.toLowerCase().includes(search);
-                    const matchDetail = item.detail.toLowerCase().includes(search);
-                    const matchOp = item.operator.toLowerCase().includes(search);
-                    if (!matchProb && !matchJob && !matchDetail && !matchOp) return false;
-                }
-                return true;
-            });
-        }
-
-        function applyFilters() {
-            const filtered = getFilteredData();
-            updateKPIs(filtered);
-            updateTable(filtered);
-            updateCharts(filtered);
-        }
-
-        function resetFilters() {
-            document.getElementById('filterMonth').value = 'ALL';
-            document.getElementById('filterDept').value = 'ALL';
-            document.getElementById('filterMachine').value = 'ALL';
-            document.getElementById('filterShift').value = 'ALL';
-            document.getElementById('filterSearch').value = '';
-            applyFilters();
-        }
-
-        function updateKPIs(data) {
-            document.getElementById('kpiTotalNC').innerText = data.length.toLocaleString();
-            
-            const totalSheets = data.reduce((acc, curr) => acc + (curr.qty_sheets || 0), 0);
-            document.getElementById('kpiTotalSheets').innerText = totalSheets.toLocaleString();
-
-            const totalPcs = data.reduce((acc, curr) => acc + (curr.qty_pcs || 0), 0);
-            document.getElementById('kpiTotalPcs').innerText = totalPcs.toLocaleString();
-
-            const deptCounts = {};
-            data.forEach(d => { deptCounts[d.dept_norm] = (deptCounts[d.dept_norm] || 0) + 1; });
-            let topDept = '-';
-            let maxCount = 0;
-            Object.keys(deptCounts).forEach(dept => {
-                if (deptCounts[dept] > maxCount) {
-                    maxCount = deptCounts[dept];
-                    topDept = dept;
-                }
-            });
-            document.getElementById('kpiTopDept').innerText = topDept;
-            document.getElementById('kpiTopDeptSub').innerText = `${maxCount} เคส (${data.length ? Math.round((maxCount/data.length)*100) : 0}%)`;
-        }
-
-        function updateTable(data) {
-            const tbody = document.getElementById('ncTableBody');
-            document.getElementById('recordCount').innerText = data.length;
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">ไม่พบข้อมูลตรงตามเงื่อนไขที่เลือก</td></tr>`;
-                return;
-            }
-
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-purple-50/60 transition border-b border-purple-50';
-                
-                const qtyText = item.qty_sheets > 0 ? `${item.qty_sheets.toLocaleString()} แผ่น` : 
-                               (item.qty_pcs > 0 ? `${item.qty_pcs.toLocaleString()} ชิ้น` : '-');
-
-                tr.innerHTML = `
-                    <td class="p-3 font-mono text-slate-500 whitespace-nowrap">${item.date || '-'}</td>
-                    <td class="p-3"><span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700 text-[11px] font-medium">${item.dept_norm}</span></td>
-                    <td class="p-3 font-semibold text-purple-600">${item.machine !== 'ไม่ระบุ' ? 'ม.' + item.machine : '-'}</td>
-                    <td class="p-3"><span class="text-amber-600 font-semibold">กะ ${item.shift}</span> <span class="text-slate-400">(${item.operator})</span></td>
-                    <td class="p-3 font-mono text-slate-600">${item.job}</td>
-                    <td class="p-3 font-medium text-pink-500">${item.problem}</td>
-                    <td class="p-3 text-right font-mono font-bold text-amber-600">${qtyText}</td>
-                    <td class="p-3 max-w-xs">
-                        <div class="text-slate-700 truncate" title="${item.detail}">${item.detail || '-'}</div>
-                        <div class="text-[11px] text-emerald-600 font-medium truncate" title="${item.action}"><i class="fa-solid fa-wrench mr-1"></i>${item.action || '-'}</div>
-                    </td>
-                    <td class="p-3 text-slate-500">${item.reporter}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function renderCharts() {
-            Chart.defaults.color = '#64748b';
-            Chart.defaults.font.family = 'Prompt';
-
-            if(chartPareto) chartPareto.destroy();
-            if(chartDept) chartDept.destroy();
-            if(chartTrend) chartTrend.destroy();
-            if(chartMachine) chartMachine.destroy();
-
-            const ctxPareto = document.getElementById('paretoChart').getContext('2d');
-            chartPareto = new Chart(ctxPareto, {
-                type: 'bar',
-                data: { 
-                    labels: [], 
-                    datasets: [{ 
-                        label: 'จำนวนเคส', 
-                        data: [], 
-                        backgroundColor: ['#c084fc', '#f472b6', '#fb923c', '#fbbf24', '#34d399', '#38bdf8', '#818cf8'], 
-                        borderRadius: 8 
-                    }] 
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
-            });
-
-            const ctxDept = document.getElementById('deptChart').getContext('2d');
-            chartDept = new Chart(ctxDept, {
-                type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#c084fc', '#f472b6', '#fb923c', '#34d399', '#38bdf8', '#a78bfa'] }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } } }
-            });
-
-            const ctxTrend = document.getElementById('trendChart').getContext('2d');
-            chartTrend = new Chart(ctxTrend, {
-                type: 'line',
-                data: { 
-                    labels: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'], 
-                    datasets: [{ 
-                        label: 'จำนวน NC (เคส)', 
-                        data: [], 
-                        borderColor: '#c084fc', 
-                        backgroundColor: 'rgba(192, 132, 252, 0.15)', 
-                        fill: true, 
-                        tension: 0.35, 
-                        pointRadius: 5, 
-                        pointBackgroundColor: '#c084fc' 
-                    }] 
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
-            });
-
-            const ctxMachine = document.getElementById('machineChart').getContext('2d');
-            chartMachine = new Chart(ctxMachine, {
-                type: 'bar',
-                data: { labels: [], datasets: [{ label: 'จำนวนเคส', data: [], backgroundColor: '#fb923c', borderRadius: 8 }] },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } } }
-            });
-        }
-
-        function updateCharts(data) {
-            const probCounts = {};
-            data.forEach(d => { probCounts[d.problem] = (probCounts[d.problem] || 0) + 1; });
-            const sortedProbs = Object.entries(probCounts).sort((a,b) => b[1] - a[1]).slice(0, 10);
-            chartPareto.data.labels = sortedProbs.map(d => d[0]);
-            chartPareto.data.datasets[0].data = sortedProbs.map(d => d[1]);
-            chartPareto.update();
-
-            const deptCounts = {};
-            data.forEach(d => { deptCounts[d.dept_norm] = (deptCounts[d.dept_norm] || 0) + 1; });
-            chartDept.data.labels = Object.keys(deptCounts);
-            chartDept.data.datasets[0].data = Object.values(deptCounts);
-            chartDept.update();
-
-            const monthsOrder = ['มกราคม69', 'กุมภาพันธ์ 69', 'มีนาคม 69', 'เมษายน 69', 'พฤษภาคม69', 'มิถุนายน 69', 'กรกฎาคม 69', 'สิงหาคม 69', 'กันยายน 69', 'ตุลาคม 69', 'พฤศจิกายน 69', 'ธันวาคม 69'];
-            const trendData = monthsOrder.map(m => data.filter(d => d.month === m).length);
-            chartTrend.data.datasets[0].data = trendData;
-            chartTrend.update();
-
-            const mcCounts = {};
-            data.forEach(d => { if(d.machine !== 'ไม่ระบุ') mcCounts['เครื่อง ' + d.machine] = (mcCounts['เครื่อง ' + d.machine] || 0) + 1; });
-            const sortedMcs = Object.entries(mcCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
-            chartMachine.data.labels = sortedMcs.map(d => d[0]);
-            chartMachine.data.datasets[0].data = sortedMcs.map(d => d[1]);
-            chartMachine.update();
-        }
-
-        function exportCSV() {
-            const filtered = getFilteredData();
-            if(!filtered.length) { alert('ไม่มีข้อมูลสำหรับส่งออก'); return; }
-
-            let csvContent = "\uFEFFวันที่,แผนก,เครื่อง,กะ,ผู้ควบคุม,JOB,ปัญหา,จำนวนแผ่น,จำนวนชิ้น,รายละเอียด,การแก้ไข,ผู้แจ้ง\n";
-            filtered.forEach(r => {
-                csvContent += `"${r.date}","${r.dept_norm}","${r.machine}","${r.shift}","${r.operator}","${r.job}","${r.problem}","${r.qty_sheets}","${r.qty_pcs}","${r.detail.replace(/"/g, '""')}","${r.action.replace(/"/g, '""')}","${r.reporter}"\n`;
-            });
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `NC_Report_WG6_${new Date().toISOString().slice(0,10)}.csv`;
-            link.click();
-        }
-    </script>
-</body>
-</html>
+        window.addEventListener('
